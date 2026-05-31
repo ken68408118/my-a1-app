@@ -2,21 +2,23 @@ import streamlit as st
 import akshare as ak
 import numpy as np
 import time
+from datetime import datetime
+import pytz  # 引入时区控制工具
 
 # 1. 设置网页标题和图标
 st.set_page_config(page_title="A股实时中位数看板", page_icon="📊", layout="centered")
 st.title("📊 A股每日实时中位数看板")
 st.caption("数据每 30 秒自动刷新一次，支持工作日盘中实时监控")
 
-# 2. 网页自动刷新机制（每30秒刷新一次）
-# 利用 streamlit 的 rerun 机制实现定时器
-if "fragment_rerun" not in st.session_state:
-    st.session_state.fragment_rerun = True
-
-# 3. 获取并计算数据
+# 2. 获取并计算数据
 @st.fragment(run_every=30)
 def show_data():
-    current_text_day = time.strftime("%A")
+    # --- 【核心修复】强制获取北京时间 ---
+    bj_tz = pytz.timezone('Asia/Shanghai')
+    now_bj = datetime.now(bj_tz)
+    
+    # 获取当前是星期几用于判断周末
+    current_text_day = now_bj.strftime("%A")
     is_weekend = current_text_day in ["Saturday", "Sunday"]
     
     # 区分周末模拟与工作日真实数据
@@ -38,17 +40,16 @@ def show_data():
     down_count = int(np.sum(all_pct_changes < 0))
     flat_count = int(np.sum(all_pct_changes == 0))
 
-    # 4. 在网页上画出精美的大屏组件（Metric 仪表盘）
-    st.markdown(f"### 🕒 刷新时间: `{time.strftime('%Y-%m-%d %H:%M:%S')}`")
+    # 4. 在网页上展现（使用格式化后的北京时间）
+    st.markdown(f"### 🕒 刷新时间: `{now_bj.strftime('%Y-%m-%d %H:%M:%S')}`")
     
     # 全A中位数大字显示
-    # 如果中位数大于0显示红色，小于0显示绿色
     color = "red" if median_value >= 0 else "green"
     st.markdown(f"## 全A涨跌幅中位数: <span style='color:{color}; font-size:40px; font-weight:bold;'>{median_value:+.2f}%</span>", unsafe_allow_html=True)
     
     st.divider() # 画一条分割线
 
-    # 三栏布局，显示上涨、平盘、下跌家数
+    # 三栏布局
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric(label="📈 上涨家数", value=f"{up_count} 家", delta=f"+{up_count}")
